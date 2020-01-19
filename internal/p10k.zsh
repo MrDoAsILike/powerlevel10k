@@ -4500,6 +4500,7 @@ function _p9k_maybe_dump() {
 }
 
 function _p9k_on_expand() {
+  _p9k__last_prompt_update_time=EPOCHREALTIME
   (( _p9k__expanded && ! $+__p9k_instant_prompt_active )) && return
 
   () {
@@ -4831,7 +4832,7 @@ function _p9k_kill_async_pump() {
 _p9k_init_async_pump() {
   local -i public_ip time_realtime
   _p9k_segment_in_use public_ip && public_ip=1
-  _p9k_segment_in_use time && (( _POWERLEVEL9K_EXPERIMENTAL_TIME_REALTIME )) && time_realtime=1
+  (( _POWERLEVEL9K_EXPERIMENTAL_TIME_REALTIME )) && time_realtime=1
   (( public_ip || time_realtime )) || return
 
   _p9k_start_async_pump() {
@@ -4896,6 +4897,7 @@ typeset -g  _p9k__param_pat
 typeset -g  _p9k__param_sig
 
 _p9k_init_vars() {
+  typeset -gF _p9k__last_prompt_update_time
   typeset -ga _p9k_show_on_command
   typeset -g  _p9k__last_buffer
   typeset -ga _p9k__last_commands
@@ -5220,14 +5222,6 @@ _p9k_init_params() {
   _p9k_declare -b POWERLEVEL9K_STATUS_EXTENDED_STATES 0
   _p9k_declare -b POWERLEVEL9K_STATUS_VERBOSE 1
   _p9k_declare -b POWERLEVEL9K_STATUS_OK_IN_NON_VERBOSE 0
-  # Format for the current time: 09:51:02. See `man 3 strftime`.
-  _p9k_declare -e POWERLEVEL9K_TIME_FORMAT "%D{%H:%M:%S}"
-  # If set to true, time will update every second.
-  _p9k_declare -b POWERLEVEL9K_EXPERIMENTAL_TIME_REALTIME 0
-  # If set to true, time will update when you hit enter. This way prompts for the past
-  # commands will contain the start times of their commands as opposed to the default
-  # behavior where they contain the end times of their preceding commands.
-  _p9k_declare -b POWERLEVEL9K_TIME_UPDATE_ON_COMMAND 0
   _p9k_declare -e POWERLEVEL9K_DATE_FORMAT "%D{%d.%m.%y}"
   _p9k_declare -s POWERLEVEL9K_VCS_ACTIONFORMAT_FOREGROUND 1
   _p9k_declare -b POWERLEVEL9K_SHOW_CHANGESET 0
@@ -5301,6 +5295,16 @@ _p9k_init_params() {
   # These correspond to `java -fullversion` and `java -version` respectively.
   _p9k_declare -b POWERLEVEL9K_JAVA_VERSION_FULL 1
   _p9k_declare -b POWERLEVEL9K_PROMPT_CHAR_OVERWRITE_STATE 0
+
+  # Format for the current time: 09:51:02. See `man 3 strftime`.
+  _p9k_declare -e POWERLEVEL9K_TIME_FORMAT "%D{%H:%M:%S}"
+  # If set to true, time will update when you hit enter. This way prompts for the past
+  # commands will contain the start times of their commands as opposed to the default
+  # behavior where they contain the end times of their preceding commands.
+  _p9k_declare -b POWERLEVEL9K_TIME_UPDATE_ON_COMMAND 0
+  # If set to true, time will update every second.
+  _p9k_declare -b POWERLEVEL9K_EXPERIMENTAL_TIME_REALTIME 0
+  _p9k_segment_in_use time || _POWERLEVEL9K_EXPERIMENTAL_TIME_REALTIME=0
 
   local -i i=1
   while (( i <= $#_POWERLEVEL9K_LEFT_PROMPT_ELEMENTS )); do
@@ -6437,11 +6441,11 @@ _p9k_init_vcs() {
   (( $_POWERLEVEL9K_VCS_BACKENDS[(I)git] )) || return
 
   local gitstatus_dir=${_POWERLEVEL9K_GITSTATUS_DIR:-${__p9k_root_dir}/gitstatus}
-  if [[ -z $GITSTATUS_DAEMON && $_p9k_uname_m == i686 && -z $gitstatus_dir/bin/*-i686(-static|)(#qN) ]]; then
+  if [[ -z $GITSTATUS_DAEMON && $_p9k_uname_m == (i686|arm7l) && -z $gitstatus_dir/bin/*-$_p9k_uname_m(-static|)(#qN) ]]; then
     _p9k__gitstatus_disabled=1
     >&2 echo -E - "${(%):-[%1FERROR%f]: %BPowerlevel10k%b is unable to use %Bgitstatus%b. Git prompt will be slow.}"
     >&2 echo -E - ""
-    >&2 echo -E - "${(%):-Reason: There is no %Bgitstatusd%b binary for i686 (32-bit Intel architecture).}"
+    >&2 echo -E - "${(%):-Reason: There is no %Bgitstatusd%b binary for $_p9k_uname_m (32-bit architecture).}"
     >&2 echo -E - ""
     >&2 echo -E - "${(%):-You can:}"
     >&2 echo -E - ""
